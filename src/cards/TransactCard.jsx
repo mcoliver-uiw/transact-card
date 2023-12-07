@@ -2,14 +2,7 @@ import { withStyles } from '@ellucian/react-design-system/core/styles';
 import { spacing40 } from '@ellucian/react-design-system/core/styles/tokens';
 import { Typography, TextLink } from '@ellucian/react-design-system/core';
 import PropTypes from 'prop-types';
-import React
-    // { useEffect, 
-    // useState } 
-    from 'react';
-// import { tokens } from '@ellucian/react-design-system';
-// import { consumers } from 'stream';
-import fetch from 'node-fetch';
-import crypto from 'crypto';
+import React from 'react';
 
 const styles = () => ({
     card: {
@@ -22,145 +15,52 @@ const styles = () => ({
 
 const TransactCard = (props) => {
     const { classes } = props;
-    // const [data, setData] = useState(null);
-    // const [error, setError] = useState(null);
-    // const [isLoading, setIsLoading] = useState(false);
-    // const crypto = require('crypto');
-    const hostName = process.env.HOST_NAME;
-    // const institutionRouteScheme= process.env.INSTITUTION_ROUTE_SCHEME;
-    // const institutionRouteValue = process.env.INSTITUTION_ROUTE_VALUE;
-    const consumerKey = process.env.CONSUMER_KEY;
-    const consumerSecret = process.env.CONSUMER_SECRET;
 
+    function generateOAuthHeader(url, consumerKey, consumerSecret) {
+        const nonce = crypto.randomBytes(16).toString('hex');
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const parameterString = `oauth_consumer_key=${consumerKey}&&oauth_nonce=${nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=${timestamp}&oauth_version=1.0`;
+        const signatureBaseString = `POST&${encodeURIComponent(url)}&${encodeURIComponent(parameterString)}`;
+        const signingKey = `${encodeURIComponent(consumerSecret)}&`;
+        const signature = crypto.createHmac('sha1', signingKey)
+            .update(signatureBaseString)
+            .digest('base64');
 
-    async function makeApiCall(url, method, headers, body = null) {
+        return `OAuth oauth_consumer_key="${consumerKey}", oauth_nonce="${nonce}", oauth_signature_method="HMAC-SHA1", oauth_timestamp="${timestamp}", oauth_signature="${encodeURIComponent(signature)}", oauth_version="1.0"`;
+    }
+
+    // const hostName = process.env.REACT_APP_HOST_NAME;
+    const consumerKey = process.env.REACT_APP_CONSUMER_KEY;
+    const consumerSecret = process.env.REACT_APP_CONSUMER_SECRET;
+    const url = 'https://uiw-tstransapp.ad.uiwtx.edu/transact/api/initiate';
+
+    async function initiateApiCall() {
+        const authHeader = generateOAuthHeader(url, consumerKey, consumerSecret);
         try {
-            const options = {
-                method: method,
-                headers: headers,
-                body: JSON.stringify(body)
-            };
-            // Only include body in POST and PUT requests
-            if (method === 'GET' || method === 'DELETE') {
-                delete options.body;
-            }
-            const response = await fetch(url, options);
-
-            // Check if response is successful
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': authHeader,
+                    'Cache-Control': 'no-cache',
+                    'Content-Length': 0,
+                    'host': '<calculated when request is sent>',
+                    'user-agent': 'PostmanRuntime/7.35.0',
+                    'Accept': '*/*',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive'
+                }
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-
             return await response.json();
         } catch (error) {
             console.error('Error making API call: ', error);
-            throw error;
         }
     }
-
-    function generateOAuthHeader(url, method, consumerKey, consumerSecret, token, tokenSecret, additionalParams = {}) {
-        // prep OAuth Params
-        const oauthParameters = {
-            oauth_consumer_key: consumerKey,
-            oauth_nonce: crypto.randomBytes(16).toString('hex'),
-            oauth_signature_method: 'HMAC_SHA1',
-            oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-            oauth_token: token || '',
-            oauth_version: 1.0,
-            ...additionalParams
-        };
-
-        // create signature base string and signing key
-        const parameterString = Object.keys({ ...oauthParameters, ...additionalParams })
-            .sort()
-            .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParameters[key])}`)
-            .join('&');
-        const encodedUrl = encodeURIComponent(url);
-        const signatureBaseString = `${method.toUpperCase()}&${encodedUrl}&${encodeURIComponent(parameterString)}`;
-        const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret || '')}`;
-        const signature = crypto.createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
-        oauthParameters.oauth_signature = signature;
-
-        // Construct the Authorization header
-        return `OAuth${Object.keys(oauthParameters).map(key => `${encodeURIComponent(key)}='${encodeURIComponent(oauthParameters[key])}'`).join(', ')}`;
-    }
-    // API calls
-
-    // Step 1
-    async function requestTempToken() {
-        const url = `https://${hostName}/transact/api/initiate`;
-        const authHeader = generateOAuthHeader(url, 'POST', consumerKey, consumerSecret);
-
-        try {
-            const response = await makeApiCall(url, 'POST', { Authorization: authHeader });
-            return response;
-        } catch (error) {
-            console.error('Error requesting temporary token: ', error.message);
-        }
-    }
-    // Step 2
-    async function requestToken(tempToken, tempTokenSecret) {
-        const url = `https://${hostName}/transact/api/token`;
-        const authHeader = generateOAuthHeader(url, 'POST', consumerKey, consumerSecret, tempToken, tempTokenSecret);
-
-        try {
-            const response = await makeApiCall(url, 'POST', { Authorization: authHeader });
-            return response;
-        } catch (error) {
-            console.error('Error requesting token: ', error.message);
-        }
-    }
-    // Step 3
-    async function validateAccessToken(token, tokenSecret) {
-        const url = `https://${hostName}/transact/api/verify`;
-        const authHeader = generateOAuthHeader(url, 'POST', consumerKey, consumerSecret, token, tokenSecret);
-
-        try {
-            const response = await makeApiCall(url, 'POST', { Authorization: authHeader });
-            return response;
-        } catch (error) {
-            console.error('Error validating access token: ', error.message);
-        }
-    }
-
-    // sequential execution
-    async function executeOAuthFlow() {
-        try {
-            // Step 1: Request temporary token and secret
-            const tempCredentials = await requestTempToken(hostName, consumerKey, consumerSecret);
-
-            // Step 2: Request token and secret
-            const tokenCredentials = await requestToken(hostName, consumerKey, consumerSecret, tempCredentials.tempToken, tempCredentials.tempTokenSecret);
-
-            // Step3: Validate access token
-            await validateAccessToken(hostName, consumerKey, consumerSecret, tokenCredentials.token, tokenCredentials.tokenSecret);
-        } catch (error) {
-            console.error('Error executing OAuth steps: ', error.message);
-        }
-    }
-    executeOAuthFlow();
-
-    //     useEffect(() => {
-
-
-    //         const fetchData = async () => {
-    //             setIsLoading(true);
-    //             try {
-    //                 const response = await fetch(`https://${hostName}/BBTS/api/management/v1/customers/0000000000000000000001/storedValueAccounts`);
-    //                 if (!response.ok) {
-    //                     throw new Error(`HTTP error! status: ${response.status}`);
-    //                 }
-    //                 const json = await response.json();
-    //                 setData(json);
-    //             } catch (error) {
-    //                 setError(error);
-    //             } finally {
-    //                 setIsLoading(false);
-    //             }
-    //         };
-
-    //         fetchData();
-    //     }, []);
+    initiateApiCall().then(response => {
+        console.log(response);
+    });
 
     return (
         <div className={classes.card}>
