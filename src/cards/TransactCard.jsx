@@ -3,6 +3,7 @@ import { spacing40 } from '@ellucian/react-design-system/core/styles/tokens';
 import { Typography, TextLink } from '@ellucian/react-design-system/core';
 import PropTypes from 'prop-types';
 import React from 'react';
+import { KJUR } from 'jsrsasign';
 
 const styles = () => ({
     card: {
@@ -16,23 +17,27 @@ const styles = () => ({
 const TransactCard = (props) => {
     const { classes } = props;
 
-    function generateOAuthHeader(url, consumerKey, consumerSecret) {
-        const nonce = crypto.randomBytes(16).toString('hex');
-        const timestamp = Math.floor(Date.now() / 1000).toString();
-        const parameterString = `oauth_consumer_key=${consumerKey}&&oauth_nonce=${nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=${timestamp}&oauth_version=1.0`;
-        const signatureBaseString = `POST&${encodeURIComponent(url)}&${encodeURIComponent(parameterString)}`;
-        const signingKey = `${encodeURIComponent(consumerSecret)}&`;
-        const signature = crypto.createHmac('sha1', signingKey)
-            .update(signatureBaseString)
-            .digest('base64');
-
-        return `OAuth oauth_consumer_key="${consumerKey}", oauth_nonce="${nonce}", oauth_signature_method="HMAC-SHA1", oauth_timestamp="${timestamp}", oauth_signature="${encodeURIComponent(signature)}", oauth_version="1.0"`;
-    }
-
     // const hostName = process.env.REACT_APP_HOST_NAME;
     const consumerKey = process.env.REACT_APP_CONSUMER_KEY;
     const consumerSecret = process.env.REACT_APP_CONSUMER_SECRET;
     const url = 'https://uiw-tstransapp.ad.uiwtx.edu/transact/api/initiate';
+
+    function generateOAuthHeader(url, consumerKey, consumerSecret) {
+        const nonce = KJUR.crypto.Util.getRandomHexOfNbytes(16);
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+
+        const parameterString = `oauth_consumer_key=${consumerKey}&oauth_nonce=${nonce}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=${timestamp}&oauth_version=1.0`;
+        const signatureBaseString = `POST&${encodeURIComponent(url)}&${encodeURIComponent(parameterString)}`;
+
+        const signingKey = `${encodeURIComponent(consumerSecret)}&`;
+
+        const mac = new KJUR.crypto.Mac({ alg: 'HmacSHA1', 'pass': signingKey});
+        mac.updateString(signatureBaseString);
+        const signature = mac.doFinal();
+
+        const base64Signature = KJUR.hextob64(signature);
+        return `OAuth oauth_consumer_key="${consumerKey}", oauth_nonce="${nonce}", oauth_signature_method="HMAC-SHA1", oauth_timestamp="${timestamp}", oauth_signature="${encodeURIComponent(base64Signature)}", oauth_version="1.0"`;
+    }
 
     async function initiateApiCall() {
         const authHeader = generateOAuthHeader(url, consumerKey, consumerSecret);
@@ -41,13 +46,6 @@ const TransactCard = (props) => {
                 method: 'POST',
                 headers: {
                     'Authorization': authHeader,
-                    'Cache-Control': 'no-cache',
-                    'Content-Length': 0,
-                    'host': '<calculated when request is sent>',
-                    'user-agent': 'PostmanRuntime/7.35.0',
-                    'Accept': '*/*',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'Connection': 'keep-alive'
                 }
             });
             if (!response.ok) {

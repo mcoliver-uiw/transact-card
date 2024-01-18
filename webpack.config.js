@@ -7,12 +7,12 @@ const webpack = require('webpack');
 require('dotenv').config();
 
 module.exports = async (env, options) => {
-plugins: [
-    new webpack.DefinePlugin({
-        'process.env.REACT_APP_CONSUMER_KEY': JSON.stringify('process.env.REACT_APP_CONSUMER_KEY'),
-        'process.env.REACT_APP_CONSUMER_SECRET': JSON.stringify('process.env.REACT_APP_CONSUMER_KEY'),
-    })
-]
+// plugins: [
+//     new webpack.DefinePlugin({
+//         'process.env.REACT_APP_CONSUMER_KEY': JSON.stringify('process.env.REACT_APP_CONSUMER_KEY'),
+//         'process.env.REACT_APP_CONSUMER_SECRET': JSON.stringify('process.env.REACT_APP_CONSUMER_KEY'),
+//     })
+// ]
     // Generate Webpack configuration based on the extension.js file
     // and any optional env flags  ("--env verbose", "--env upload", etc)
     const webpackConfig = await webpackConfigBuilder({
